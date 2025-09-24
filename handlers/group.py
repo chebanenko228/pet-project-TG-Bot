@@ -23,7 +23,7 @@ async def group_message(message: types.Message):
 
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
-            "SELECT expires_at, posts_today, last_post_date FROM access WHERE user_id=?",
+            "SELECT expires_at, posts_today, last_post_date, max_posts FROM access WHERE user_id=?",
             (user_id,)
         )
         row = await cursor.fetchone()
@@ -32,7 +32,7 @@ async def group_message(message: types.Message):
             await message.delete()
             return
 
-        expires_at, posts_today, last_post_date = row
+        expires_at, posts_today, last_post_date, max_posts = row
 
         if expires_at and now > datetime.fromisoformat(expires_at):
             await db.execute("DELETE FROM access WHERE user_id=?", (user_id,))
@@ -44,7 +44,7 @@ async def group_message(message: types.Message):
         if not last_post_date or datetime.fromisoformat(last_post_date).date() != today:
             posts_today = 0
 
-        if posts_today >= 3:
+        if posts_today >= max_posts:
             await message.delete()
         else:
             await db.execute(

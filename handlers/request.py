@@ -31,13 +31,13 @@ async def request_access(message: types.Message):
     async with aiosqlite.connect(DB_PATH) as db:
         # 🔹 Проверяем активный доступ
         cursor = await db.execute(
-            "SELECT expires_at, posts_today, last_post_date FROM access WHERE user_id=?",
+            "SELECT expires_at, posts_today, last_post_date, max_posts FROM access WHERE user_id=?",
             (user_id,)
         )
         access_row = await cursor.fetchone()
 
         if access_row:
-            expires_at, posts_today, last_post_date = access_row
+            expires_at, posts_today, last_post_date, max_posts = access_row
             if expires_at:
                 expires_dt = datetime.fromisoformat(expires_at)
                 if expires_dt > now:
@@ -48,7 +48,7 @@ async def request_access(message: types.Message):
                     await message.answer(
                         f"⚠️ У тебя уже есть доступ.\n"
                         f"Осталось {days_left} дн.\n"
-                        f"Сегодня {used_posts}/3 постов."
+                        f"Сегодня {used_posts}/{max_posts} постов."
                     )
                     return
 
@@ -113,8 +113,8 @@ async def decision(callback: types.CallbackQuery):
 
             # Добавляем доступ
             await db.execute(
-                "REPLACE INTO access (user_id, username, expires_at, posts_today, last_post_date) VALUES (?, ?, ?, ?, ?)",
-                (user_id, username, expires.isoformat(), 0, None)
+                "REPLACE INTO access (user_id, username, expires_at, posts_today, last_post_date, max_posts) VALUES (?, ?, ?, ?, ?, ?)",
+                (user_id, username, expires.isoformat(), 0, None, 3)
             )
             await db.commit()
 

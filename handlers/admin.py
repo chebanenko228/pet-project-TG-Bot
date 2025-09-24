@@ -1,7 +1,7 @@
 from aiogram import types
 from aiogram.filters import Command
 import aiosqlite
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from config import dp, bot, ADMIN_IDS, DB_PATH
 
 
@@ -15,7 +15,7 @@ async def list_access(message: types.Message):
 
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
-            "SELECT user_id, username, expires_at, posts_today FROM access"
+            "SELECT user_id, username, expires_at, posts_today, max_posts FROM access"
         )
         rows = await cursor.fetchall()
 
@@ -24,10 +24,10 @@ async def list_access(message: types.Message):
         return
 
     text = "📋 Активные пользователи:\n"
-    for uid, username, expires, posts in rows:
+    for uid, username, expires, posts, max_posts in rows:
         expires_dt = datetime.fromisoformat(expires)
         expires_str = expires_dt.strftime("%d.%m.%Y %H:%M")
-        text += f"ID {uid}, @{username or 'без username'} — до {expires_str}, {posts}/3 постов сегодня\n"
+        text += f"ID {uid}, @{username or 'без username'} — до {expires_str}, {posts}/{max_posts} постов сегодня\n"
 
     await message.answer(text)
 
@@ -113,3 +113,86 @@ async def reset_all(message: types.Message):
         await db.commit()
 
     await message.answer("✅ Счётчики у всех пользователей сброшены.")
+
+
+# ------------------- Добавление дней к крайней дате -------------------
+@dp.message(Command("extend"))
+async def extend_access(message: types.Message):
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer("❌ У вас нет прав для этой команды.")
+        return
+
+    args = message.text.split()
+    if len(args) < 3:
+        await message.answer("⚠️ Использование: /extend <user_id> <days>")
+        return
+
+    try:
+        user_id = int(args[1])
+        days = int(args[2])
+        if days <= 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("❗️ user_id и days должны быть положительными числами.")
+        return
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("SELECT expires_at, username FROM access WHERE user_id=?", (user_id,))
+        row = await cursor.fetchone()
+
+        if not row:
+            await message.answer(f"⚠️ Пользователь с ID {user_id} не найден в базе.")
+            return
+
+        expires_at, username = row
+        now = datetime.now(timezone.utc)
+        if expires_at:
+            expires_dt = datetime.fromisoformat(expires_at)
+            if expires_dt < now:
+                expires_dt = now
+        else:
+            expires_dt = now
+
+        new_expires = expires_dt + timedelta(days=days)
+
+        await db.execute("UPDATE access SET expires_at=? WHERE user_id=?", (new_expires.isoformat(), user_id))
+        await db.commit()
+
+    await message.answer(f"✅ Доступ пользователя @{username or user_id} продлён до {new_expires.strftime('%d.%m.%Y %H:%M')}")
+    await bot.send_message(user_id, f"⏳ Ваш доступ был продлён до {new_expires.strftime('%d.%m.%Y %H:%M')}")
+
+
+# ------------------- Изменение лимита сообщений в день -------------------
+@dp.message(Command("setlimit"))
+async def set_limit(message: types.Message):
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer("❌ У вас нет прав для этой команды.")
+        return
+
+    args = message.text.split()
+    if len(args) < 3:
+        await message.answer("⚠️ Использование: /setlimit <user_id> <limit>")
+        return
+
+    try:
+        user_id = int(args[1])
+        new_limit = int(args[2])
+        if new_limit <= 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("❗ user_id и limit должны быть положительными числами.")
+        return
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("SELECT username FROM access WHERE user_id=?", (user_id,))
+        row = await cursor.fetchone()
+        if not row:
+            await message.answer(f"⚠️ Пользователь {user_id} не найден.")
+            return
+
+        await db.execute("UPDATE access SET max_posts=? WHERE user_id=?", (new_limit, user_id))
+        await db.commit()
+
+    await message.answer(f"✅ Лимит постов для @{row[0] or user_id} изменён на {new_limit}")
+    await bot.send_message(user_id, f"📢 Ваш лимит постов изменён: теперь {new_limit}.")
+

@@ -11,7 +11,8 @@ async def init_db():
             username TEXT,
             expires_at TEXT,
             posts_today INTEGER DEFAULT 0,
-            last_post_date TEXT
+            last_post_date TEXT,
+            max_posts INTEGER DEFAULT 3
         )
         """)
 
