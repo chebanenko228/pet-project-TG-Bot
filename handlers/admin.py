@@ -42,7 +42,7 @@ async def revoke_access(message: types.Message):
 
     args = message.text.split()
     if len(args) < 2:
-        await message.answer("❗️ Использование: /revoke <user_id>")
+        await message.answer("❗️ Использование: /revoke `user_id`", parse_mode="Markdown")
         return
 
     try:
@@ -79,7 +79,10 @@ async def reset_user(message: types.Message):
 
     args = message.text.split()
     if len(args) < 2:
-        await message.answer("⚠️ Использование: /reset_user <user_id>")
+        await message.answer(
+            "⚠️ Использование: /reset_user <code>user_id</code>",
+            parse_mode="HTML"
+        )
         return
 
     try:
@@ -124,7 +127,7 @@ async def extend_access(message: types.Message):
 
     args = message.text.split()
     if len(args) < 3:
-        await message.answer("⚠️ Использование: /extend <user_id> <days>")
+        await message.answer("⚠️ Использование: /extend `user_id` `days`", parse_mode="Markdown")
         return
 
     try:
@@ -171,7 +174,7 @@ async def set_limit(message: types.Message):
 
     args = message.text.split()
     if len(args) < 3:
-        await message.answer("⚠️ Использование: /setlimit <user_id> <limit>")
+        await message.answer("⚠️ Использование: /setlimit `user_id` `limit`", parse_mode="Markdown")
         return
 
     try:
@@ -207,12 +210,12 @@ async def help_admin(message: types.Message):
     help_text = (
         "📌 Доступные админские команды:\n\n"
         "/list — Показать всех активных пользователей и их лимиты\n"
-        "/revoke <user_id> — Лишить пользователя доступа\n"
-        "/reset_user <user_id> — Сбросить дневной лимит постов конкретного пользователя\n"
+        "/revoke <code>user_id</code> — Лишить пользователя доступа\n"
+        "/reset_user <code>user_id</code> — Сбросить дневной лимит постов конкретного пользователя\n"
         "/reset_all — Сбросить дневной лимит постов у всех пользователей\n"
-        "/extend <user_id> <days> — Продлить доступ пользователю на указанное количество дней\n"
-        "/setlimit <user_id> <limit> — Изменить максимальный лимит постов пользователя\n"
+        "/extend <code>user_id</code> <code>days</code> — Продлить доступ пользователю на указанное количество дней\n"
+        "/setlimit <code>user_id</code> <code>limit</code> — Изменить максимальный лимит постов пользователя\n"
         "\nИспользуйте команды внимательно!"
     )
 
-    await message.answer(help_text)
+    await message.answer(help_text, parse_mode="HTML")
