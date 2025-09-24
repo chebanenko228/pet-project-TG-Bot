@@ -2,6 +2,3 @@
 .idea/
 .venv/
 group_access.db
-test_bot.py
-main.py
-group_access.db
