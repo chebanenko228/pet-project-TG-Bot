@@ -125,9 +125,17 @@ async def decision(callback: types.CallbackQuery):
             await callback.message.edit_text(f"Одобрено ✅ (ID {user_id}, @{username})")
 
         elif action == "deny":
-            # просто удаляем заявку
-            await db.execute("DELETE FROM requests WHERE user_id=?", (user_id,))
-            await db.commit()
+            # проверяем, есть ли запись
+            cursor = await db.execute("SELECT user_id FROM requests WHERE user_id=?", (user_id,))
+            row = await cursor.fetchone()
+
+            if not row:
+                # создаём запись, если её нет
+                await db.execute(
+                    "INSERT INTO requests (user_id, username, requested_at) VALUES (?, ?, ?)",
+                    (user_id, username, datetime.now(timezone.utc).isoformat())
+                )
+                await db.commit()
 
             await bot.send_message(user_id, "❌ Ваша заявка отклонена.")
             await callback.message.edit_text(f"Отклонено ❌ (ID {user_id}, @{username})")
