@@ -1,3 +1,4 @@
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram import types
 from aiogram.filters import Command
 import aiosqlite
@@ -104,18 +105,41 @@ async def reset_user(message: types.Message):
         await message.answer("⚠️ Пользователь с таким ID не найден в базе.")
 
 
-# ------------------- СБРОС У ВСЕХ -------------------
+# ------------------- СБРОС У ВСЕХ (запрос подтверждения) -------------------
 @dp.message(Command("reset_all"))
 async def reset_all(message: types.Message):
     if message.from_user.id not in ADMIN_IDS:
         await message.answer("❌ У вас нет прав для этой команды.")
         return
 
+    kb = InlineKeyboardBuilder()
+    kb.button(text="✅ Подтвердить сброс", callback_data="confirm_reset_all")
+    kb.button(text="❌ Отменить", callback_data="cancel_reset_all")
+
+    await message.answer(
+        "⚠️ Вы уверены, что хотите сбросить счётчики у всех пользователей?",
+        reply_markup=kb.as_markup()
+    )
+
+# ------------------- CALLBACK ДЛЯ ПОДТВЕРЖДЕНИЯ СБРОСА У ВСЕХ-------------------
+@dp.callback_query(lambda c: c.data in ["confirm_reset_all", "cancel_reset_all"])
+async def reset_all_callback(callback: types.CallbackQuery):
+    if callback.from_user.id not in ADMIN_IDS:
+        await callback.answer("❌ У вас нет прав для этой команды.", show_alert=True)
+        return
+
+    if callback.data == "cancel_reset_all":
+        await callback.message.edit_text("❌ Сброс отменён.")
+        await callback.answer()
+        return
+
+    # выполняем сброс
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("UPDATE access SET posts_today = 0")
         await db.commit()
 
-    await message.answer("✅ Счётчики у всех пользователей сброшены.")
+    await callback.message.edit_text("✅ Счётчики у всех пользователей сброшены.")
+    await callback.answer()
 
 
 # ------------------- Добавление дней к крайней дате -------------------
