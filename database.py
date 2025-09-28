@@ -19,12 +19,9 @@ async def init_db():
         # Таблица заявок
         await db.execute("""
         CREATE TABLE IF NOT EXISTS requests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
+            user_id INTEGER PRIMARY KEY,
             username TEXT,
-            requested_at TEXT,
-            status TEXT,              -- pending / approved / denied
-            FOREIGN KEY (user_id) REFERENCES access(user_id)
+            requested_at TEXT
         )
         """)
 

@@ -21,8 +21,6 @@ async def reset_daily():
 
 
 # ------------------- ПРОВЕРКА ИСТЕКШИХ ДОСТУПОВ -------------------
-from aiogram.exceptions import TelegramBadRequest
-
 async def check_expired():
     while True:
         now = datetime.now(timezone.utc)
@@ -55,3 +53,16 @@ async def check_expired():
                             print(f"[WARN] Не удалось отправить сообщение админу {admin_id}")
 
         await asyncio.sleep(60)
+
+
+# ------------------- УДАЛЕНИЯ ЗАЯВОК ЧЕРЕЗ ЧАС -------------------
+async def cleanup_requests():
+    while True:
+        now = datetime.now(timezone.utc)
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "DELETE FROM requests WHERE requested_at <= ?",
+                ((now - timedelta(hours=1)).isoformat(),)
+            )
+            await db.commit()
+        await asyncio.sleep(60)  # проверяем каждую минуту

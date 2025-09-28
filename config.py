@@ -1,6 +1,8 @@
 from aiogram.client.bot import DefaultBotProperties
 from aiogram import Bot, Dispatcher
+from datetime import datetime, timezone
 
+BOT_START_TIME = datetime.now(timezone.utc)
 
 API_TOKEN = ""
 ADMIN_IDS = []  # ID администраторов

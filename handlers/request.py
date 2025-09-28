@@ -21,7 +21,7 @@ async def request_access(message: types.Message):
     - Если нет заявки → создаём новую и уведомляем админа.
     """
     user_id = message.from_user.id
-    username = message.from_user.username or f"id{user_id}"
+    username = message.from_user.username or "неизвестный"
     now = datetime.now(timezone.utc)
 
     if user_id in ADMIN_IDS:
@@ -39,45 +39,40 @@ async def request_access(message: types.Message):
 
         if access_row:
             expires_at, posts_today, last_post_date, max_posts = access_row
-            if expires_at:
-                expires_dt = datetime.fromisoformat(expires_at)
-                if expires_dt > now:
-                    days_left = (expires_dt.date() - now.date()).days
-                    used_posts = 0
-                    if last_post_date and datetime.fromisoformat(last_post_date).date() == now.date():
-                        used_posts = posts_today
-                    await message.answer(
-                        f"⚠️ У тебя уже есть доступ.\n"
-                        f"Осталось {days_left} дн.\n"
-                        f"Сегодня {used_posts}/{max_posts} постов."
-                    )
-                    return
+            if expires_at and datetime.fromisoformat(expires_at) > now:
+                days_left = (datetime.fromisoformat(expires_at).date() - now.date()).days
+                used_posts = 0
+                if last_post_date and datetime.fromisoformat(last_post_date).date() == now.date():
+                    used_posts = posts_today
+                await message.answer(
+                    f"⚠️ У тебя уже есть доступ.\n"
+                    f"Осталось {days_left} дн.\n"
+                    f"Сегодня {used_posts}/{max_posts} постов."
+                )
+                return
 
         # 🔹 Проверяем последнюю заявку пользователя
         cursor = await db.execute(
-            "SELECT requested_at, status FROM requests WHERE user_id=? ORDER BY id DESC LIMIT 1",
+            "SELECT requested_at FROM requests WHERE user_id=?",
             (user_id,)
         )
-        request_row = await cursor.fetchone()
+        row = await cursor.fetchone()
 
-        if request_row:
-            requested_at, status = request_row
-            if requested_at:
-                last_request = datetime.fromisoformat(requested_at)
-                delta = now - last_request
-                if delta < timedelta(hours=1):
-                    minutes_left = int((timedelta(hours=1) - delta).total_seconds() // 60)
-                    await message.answer(
-                        f"⏳ Ты можешь отправлять заявку только раз в час. Подожди {minutes_left} мин."
-                    )
-                    return
-
-        # 🔹 Создаём новую заявку
-        await db.execute(
-            "INSERT INTO requests (user_id, username, requested_at, status) VALUES (?, ?, ?, ?)",
-            (user_id, username, now.isoformat(), "pending")
-        )
-        await db.commit()
+        if row:
+            last_request = datetime.fromisoformat(row[0])
+            if (now - last_request) < timedelta(hours=1):
+                minutes_left = int((timedelta(hours=1) - (now - last_request)).total_seconds() // 60)
+                await message.answer(
+                    f"⏳ Ты можешь отправлять заявку только раз в час. Подожди {minutes_left} мин."
+                )
+                return
+        else:
+            # вставляем новую заявку, если её нет
+            await db.execute(
+                "INSERT INTO requests (user_id, username, requested_at) VALUES (?, ?, ?)",
+                (user_id, username, now.isoformat())
+            )
+            await db.commit()
 
     # 🔹 Уведомление администратору
     kb = InlineKeyboardBuilder()
@@ -97,26 +92,30 @@ async def request_access(message: types.Message):
 # ------------------- РЕШЕНИЕ АДМИНА -------------------
 @dp.callback_query()
 async def decision(callback: types.CallbackQuery):
-    action, user_id_str, username = callback.data.split("_", 2)
-    user_id = int(user_id_str)
-    if username == "":
-        username = f"id{user_id}"
+    # разбор callback_data
+    try:
+        action, user_id_str, username = callback.data.split("_", 2)
+        user_id = int(user_id_str)
+    except ValueError:
+        await callback.answer("❌ Некорректные данные.")
+        return
 
     async with aiosqlite.connect(DB_PATH) as db:
         if action == "approve":
+            # выдаём доступ на 7 дней, 3 поста в день
             expires = datetime.now(timezone.utc) + timedelta(days=7)
 
-            # Обновляем заявку
+            # обновляем таблицу access
             await db.execute(
-                "UPDATE requests SET status=? WHERE user_id=? AND status='pending'",
-                ("approved", user_id)
-            )
-
-            # Добавляем доступ
-            await db.execute(
-                "REPLACE INTO access (user_id, username, expires_at, posts_today, last_post_date, max_posts) VALUES (?, ?, ?, ?, ?, ?)",
+                """
+                REPLACE INTO access (user_id, username, expires_at, posts_today, last_post_date, max_posts)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
                 (user_id, username, expires.isoformat(), 0, None, 3)
             )
+
+            # удаляем заявку из requests (она больше не нужна)
+            await db.execute("DELETE FROM requests WHERE user_id=?", (user_id,))
             await db.commit()
 
             await bot.send_message(
@@ -126,11 +125,8 @@ async def decision(callback: types.CallbackQuery):
             await callback.message.edit_text(f"Одобрено ✅ (ID {user_id}, @{username})")
 
         elif action == "deny":
-            # Обновляем заявку
-            await db.execute(
-                "UPDATE requests SET status=? WHERE user_id=? AND status='pending'",
-                ("denied", user_id)
-            )
+            # просто удаляем заявку
+            await db.execute("DELETE FROM requests WHERE user_id=?", (user_id,))
             await db.commit()
 
             await bot.send_message(user_id, "❌ Ваша заявка отклонена.")
