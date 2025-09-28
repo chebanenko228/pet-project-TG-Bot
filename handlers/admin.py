@@ -1,8 +1,9 @@
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram import types
-from aiogram.filters import Command
 import aiosqlite
 from datetime import datetime, timedelta, timezone
+from aiogram import types
+from aiogram.filters import Command
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+
 from config import dp, bot, ADMIN_IDS, DB_PATH
 
 
@@ -120,6 +121,7 @@ async def reset_all(message: types.Message):
         "⚠️ Вы уверены, что хотите сбросить счётчики у всех пользователей?",
         reply_markup=kb.as_markup()
     )
+
 
 # ------------------- CALLBACK ДЛЯ ПОДТВЕРЖДЕНИЯ СБРОСА У ВСЕХ-------------------
 @dp.callback_query(lambda c: c.data in ["confirm_reset_all", "cancel_reset_all"])

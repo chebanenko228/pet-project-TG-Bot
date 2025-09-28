@@ -1,7 +1,7 @@
 import asyncio
 from config import dp, bot
 from database import init_db
-from services.scheduler import reset_daily, check_expired
+from services.scheduler import reset_daily, check_expired, cleanup_requests
 
 # Подключаем все handlers
 import handlers.start
@@ -15,6 +15,7 @@ async def main():
     await init_db()
     asyncio.create_task(reset_daily())
     asyncio.create_task(check_expired())
+    asyncio.create_task(cleanup_requests())
     await dp.start_polling(bot)
 
 

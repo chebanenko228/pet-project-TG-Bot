@@ -90,7 +90,7 @@ async def request_access(message: types.Message):
 
 
 # ------------------- РЕШЕНИЕ АДМИНА -------------------
-@dp.callback_query()
+@dp.callback_query(lambda c: c.data.startswith("approve_") or c.data.startswith("deny_"))
 async def decision(callback: types.CallbackQuery):
     # разбор callback_data
     try:
