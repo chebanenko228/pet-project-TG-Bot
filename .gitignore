@@ -2,3 +2,4 @@
 .idea/
 .venv/
 group_access.db
+.env
