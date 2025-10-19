@@ -56,7 +56,7 @@ pip install -r requirements.txt
 1. Отправьте команду `/newbot` и следуйте инструкциям.
 2. Сохраните API токен для бота.
 
-### 5. Настройте параметры в `config.py`
+### 5. Настройте параметры в `.env` (для этого есть .env.example)
 
 ```python
 API_TOKEN = "ВАШ_API_TOKEN"
