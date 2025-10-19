@@ -13,11 +13,24 @@ import handlers.group
 # ------------------- ЗАПУСК -------------------
 async def main():
     await init_db()
-    asyncio.create_task(reset_daily())
-    asyncio.create_task(check_expired())
-    asyncio.create_task(cleanup_requests())
-    await dp.start_polling(bot)
+    tacks = [
+        asyncio.create_task(reset_daily()),
+        asyncio.create_task(check_expired()),
+        asyncio.create_task(cleanup_requests()),
+    ]
+    try:
+        await dp.start_polling(bot)
+    finally:
+        # Останавливаем фоновые задачи
+        for task in tacks:
+            task.cancel()
+        await asyncio.gather(*tacks, return_exceptions=True)
+        # Закрываем сессию бота
+        await bot.session.close()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass
